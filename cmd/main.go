@@ -36,7 +36,7 @@ func main() {
 	case "version":
 		internal.VersionApp()
 	default:
-		fmt.Println("usage: pw.exe [-v|-version]")
+		fmt.Println("usage: pw.gen [gen,logins,domains,version] -h")
 
 	}
 }

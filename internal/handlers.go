@@ -32,9 +32,11 @@ func PrintLogins() {
 	err := set.Parse(os.Args[2:])
 	if err != nil {
 		slog.Error("Parse params", "error", err.Error())
+		set.Usage()
+		os.Exit(1)
 	}
 	if pass == "" {
-		slog.Error("You must provide a password")
+		set.Usage()
 		os.Exit(1)
 	}
 
@@ -75,9 +77,12 @@ func PrintDomains() {
 	err := set.Parse(os.Args[2:])
 	if err != nil {
 		slog.Error("Parse params", "error", err.Error())
+		set.Usage()
+		os.Exit(1)
 	}
 	if pass == "" {
 		slog.Error("You must provide a password")
+		set.Usage()
 		os.Exit(1)
 	}
 
@@ -118,13 +123,14 @@ func Generate() {
 	err := set.Parse(os.Args[2:])
 	if err != nil {
 		slog.Error("Parse params", "error", err.Error())
+		os.Exit(1)
 	}
 	if domain == "" {
-		flag.Usage()
+		set.Usage()
 		os.Exit(1)
 	}
 	if pass == "" {
-		flag.Usage()
+		set.Usage()
 		os.Exit(1)
 	}
 	var ver string
