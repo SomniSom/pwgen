@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/boltdb/bolt"
-	"log/slog"
 )
 
 type Data struct {
@@ -13,16 +12,21 @@ type Data struct {
 	Vesion int    `json:"vesion"`
 }
 
-var db *bolt.DB
+type DB struct {
+	db *bolt.DB
+}
+
+var db = DB{}
 
 const bucketName = "pwds"
 
 func InitDB(filename string) (err error) {
-	db, err = bolt.Open(filename, 0600, &bolt.Options{})
+	db.db, err = bolt.Open(filename, 0600, &bolt.Options{})
 	if err != nil {
 		return err
 	}
-	_ = db.Update(func(tx *bolt.Tx) error {
+
+	_ = db.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
@@ -32,14 +36,8 @@ func InitDB(filename string) (err error) {
 	return err
 }
 
-func save(value Data) error {
-	k := []byte(value.Domain)
-
-	v, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	return db.Update(func(tx *bolt.Tx) error {
+func (d DB) save(k, v []byte) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
@@ -48,11 +46,11 @@ func save(value Data) error {
 	})
 }
 
-func read(domain string) (*Data, error) {
+func (d DB) read(domain string) (*Data, error) {
 	k := []byte(domain)
 
 	u := new(Data)
-	err := db.View(func(tx *bolt.Tx) error {
+	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
 			return fmt.Errorf("get bucket: FAILED")
@@ -66,44 +64,16 @@ func read(domain string) (*Data, error) {
 	return u, err
 }
 
-func listLogins() ([]string, error) {
-	var logins []string
-	err := db.View(func(tx *bolt.Tx) error {
+func (d DB) list() ([][]byte, error) {
+	var logins [][]byte
+	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
 			return fmt.Errorf("get bucket: FAILED")
 		}
 		c := b.Cursor()
-		var dt Data
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			err := json.Unmarshal(v, &dt)
-			if err != nil {
-				slog.Warn("Unmarshal FAILED", "domain", k)
-				continue
-			}
-			logins = append(logins, dt.Login)
-		}
-		return nil
-	})
-	return logins, err
-}
-
-func listDomains() ([]string, error) {
-	var logins []string
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		if b == nil {
-			return fmt.Errorf("get bucket: FAILED")
-		}
-		c := b.Cursor()
-		var dt Data
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			err := json.Unmarshal(v, &dt)
-			if err != nil {
-				slog.Warn("Unmarshal FAILED", "domain", k)
-				continue
-			}
-			logins = append(logins, dt.Login)
+			logins = append(logins, v)
 		}
 		return nil
 	})

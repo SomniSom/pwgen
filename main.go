@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
+	"github.com/boltdb/bolt"
+	"log/slog"
 	rand2 "math/rand/v2"
 	"os"
 )
@@ -11,8 +13,6 @@ const (
 	dbFile = "pw.db"
 	sm     = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 )
-
-var dbKey = "masterkey"
 
 func GeneratePassword(pw, site string, version string) string {
 	hash := sha256.Sum256([]byte(pw + site + version))
@@ -41,9 +41,17 @@ var (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: pw.gen [-v|-version]")
+		fmt.Println("usage: pw.gen [gen,logins,domains,version] -h")
 		return
 	}
+	err := InitDB(dbFile)
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	defer func(db *bolt.DB) {
+		_ = db.Close()
+	}(db.db)
 	switch os.Args[1] {
 	case "gen":
 		generate()
@@ -57,15 +65,4 @@ func main() {
 		fmt.Println("usage: pw.exe [-v|-version]")
 
 	}
-
-	//key := sha256.Sum256([]byte("1234567890"))
-	//enc, err := encrypt([]byte(`{"test": "test"}`), key[:32])
-	//if err != nil {
-	//	slog.Error("Encrypt", "err", err)
-	//	return
-	//}
-	//dec, err := decrypt(enc, key[:32])
-	//fmt.Println(string(dec))
-	//return
-
 }
