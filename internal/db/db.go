@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"encoding/json"
@@ -12,21 +12,21 @@ type Data struct {
 	Vesion int    `json:"vesion"`
 }
 
-type DB struct {
+type Database struct {
 	db *bolt.DB
 }
 
-var db = DB{}
+var DB = Database{}
 
 const bucketName = "pwds"
 
 func InitDB(filename string) (err error) {
-	db.db, err = bolt.Open(filename, 0600, &bolt.Options{})
+	DB.db, err = bolt.Open(filename, 0600, &bolt.Options{})
 	if err != nil {
 		return err
 	}
 
-	_ = db.db.Update(func(tx *bolt.Tx) error {
+	_ = DB.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
@@ -36,7 +36,11 @@ func InitDB(filename string) (err error) {
 	return err
 }
 
-func (d DB) save(k, v []byte) error {
+func (d Database) Close() {
+	_ = d.db.Close()
+}
+
+func (d Database) Save(k, v []byte) error {
 	return d.db.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
@@ -46,7 +50,7 @@ func (d DB) save(k, v []byte) error {
 	})
 }
 
-func (d DB) read(domain string) (*Data, error) {
+func (d Database) Read(domain string) (*Data, error) {
 	k := []byte(domain)
 
 	u := new(Data)
@@ -64,7 +68,7 @@ func (d DB) read(domain string) (*Data, error) {
 	return u, err
 }
 
-func (d DB) list() ([][]byte, error) {
+func (d Database) List() ([][]byte, error) {
 	var logins [][]byte
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))

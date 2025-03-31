@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"crypto/sha256"
@@ -7,15 +7,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"pwgen/internal/cipher"
+	"pwgen/internal/db"
+	"pwgen/internal/gen"
 	"strconv"
 	"strings"
 )
 
-func versionApp() {
+var (
+	version int
+	login   string
+	pass    string
+	domain  string
+)
+
+func VersionApp() {
 	fmt.Println("pw.gen v0.0.1")
 }
 
-func printLogins() {
+func PrintLogins() {
 	set := flag.NewFlagSet("", flag.ExitOnError)
 	set.StringVar(&domain, "d", "", "Domain filter logins")
 	set.StringVar(&pass, "p", "", "Password to generate sub password")
@@ -28,15 +38,15 @@ func printLogins() {
 		os.Exit(1)
 	}
 
-	data, err := db.list()
+	data, err := db.DB.List()
 	if err != nil {
 		slog.Error("List database", "error", err.Error())
 		os.Exit(1)
 	}
 	key := sha256.Sum256([]byte(pass))
-	var dbdata = new(Data)
+	var dbdata = new(db.Data)
 	for _, j := range data {
-		dt, err := decrypt(j, key[:32])
+		dt, err := cipher.Decrypt(j, key[:32])
 		if err != nil {
 			slog.Error("decrypt data", "error", err.Error())
 			continue
@@ -58,7 +68,7 @@ func printLogins() {
 	}
 }
 
-func printDomains() {
+func PrintDomains() {
 	set := flag.NewFlagSet("", flag.ExitOnError)
 	set.StringVar(&login, "l", "", "Login filter domains")
 	set.StringVar(&pass, "p", "", "Password to generate sub password")
@@ -71,15 +81,15 @@ func printDomains() {
 		os.Exit(1)
 	}
 
-	data, err := db.list()
+	data, err := db.DB.List()
 	if err != nil {
 		slog.Error("List database", "error", err.Error())
 		os.Exit(1)
 	}
 	key := sha256.Sum256([]byte(pass))
-	var dbdata = new(Data)
+	var dbdata = new(db.Data)
 	for _, j := range data {
-		dt, err := decrypt(j, key[:32])
+		dt, err := cipher.Decrypt(j, key[:32])
 		if err != nil {
 			slog.Error("decrypt data", "error", err.Error())
 			continue
@@ -99,7 +109,7 @@ func printDomains() {
 	}
 }
 
-func generate() {
+func Generate() {
 	set := flag.NewFlagSet("", flag.ExitOnError)
 	set.StringVar(&domain, "d", "", "Domain to generate sub password")
 	set.IntVar(&version, "v", 0, "Version to generate sub password")
@@ -121,16 +131,16 @@ func generate() {
 	if version > 0 {
 		ver = strconv.Itoa(version)
 	}
-	password := GeneratePassword(pass, domain, ver)
+	password := gen.GeneratePassword(pass, domain, ver)
 	fmt.Printf("Generated password for %s: %s\n", domain, password)
-	err = saveToDB(Data{Domain: domain, Login: login, Vesion: version}, pass)
+	err = saveToDB(db.Data{Domain: domain, Login: login, Vesion: version}, pass)
 	if err != nil {
 		slog.Error("Save database", "error", err.Error())
 		os.Exit(1)
 	}
 }
 
-func saveToDB(d Data, pass string) error {
+func saveToDB(d db.Data, pass string) error {
 	key := sha256.Sum256([]byte(pass))
 	k := sha256.Sum256([]byte(d.Domain + d.Login))
 
@@ -138,11 +148,11 @@ func saveToDB(d Data, pass string) error {
 	if err != nil {
 		return err
 	}
-	v, err := encrypt(val, key[:32])
+	v, err := cipher.Encrypt(val, key[:32])
 	if err != nil {
 		return err
 	}
-	err = db.save(k[:32], v)
+	err = db.DB.Save(k[:32], v)
 	if err != nil {
 		return err
 	}
