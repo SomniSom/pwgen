@@ -15,36 +15,39 @@ BUILD_TARGETS := $(addsuffix -$(APP_NAME), $(basename $(PLATFORMS)))
 
 # Функция для сборки и упаковки приложения для конкретной платформы
 build-%:
-	@GOOS=$* GOARCH=${platform##*/} $(GO_CMD) build -o $*.$(APP_NAME) $(SRC_DIR)/main.go
+	@GOOS=$* GOARCH=$${platform##*/} $(GO_CMD) build -o $*.$(APP_NAME) $(SRC_DIR)/main.go
 
-# Упаковка в дистрибутив (создание архива)
-package:
+build_and_package:
 	@for platform in $(PLATFORMS); do \
-		ARCHIVE_NAME=$(APP_NAME)-$$platform.tar.gz; \
-		tar -czf $$ARCHIVE_NAME $$(build-$$platform); \
-		rm build-$$platform.$(APP_NAME); \
+		CGO_ENABLED=0 GOOS=$${platform%/*} GOARCH=$${platform##*/} $(GO_CMD) build -o $$platform/$(APP_NAME) $(SRC_DIR)/main.go; \
 	done
 
-# Сборка для всех платформ
-build_and_package: $(BUILD_TARGETS) package
-	@echo "All platforms built and packaged."
+package:
+	@for platform in $(PLATFORMS); do \
+		ARCHIVE_NAME=./build/$${platform%/*}.tar.gz; \
+		mkdir -p "build"; \
+		tar -C $$platform -czf $$ARCHIVE_NAME $(APP_NAME); \
+		rm -rf $${platform%/*}; \
+	done
 
 # Отдельные цели сборки для каждой платформы
 .PHONY: build-darwin-amd64
 build-darwin-amd64:
-	$(GO_CMD) build -o build-macos/$(APP_NAME) $(SRC_DIR)/main.go
+	$(GO_CMD) build -o macos/$(APP_NAME) $(SRC_DIR)/main.go
 
 .PHONY: build-linux-amd64
 build-linux-amd64:
-	$(GO_CMD) build -o build-linux/$(APP_NAME) $(SRC_DIR)/main.go
+	$(GO_CMD) build -o linux/$(APP_NAME) $(SRC_DIR)/main.go
 
 .PHONY: build-windows-amd64
 build-windows-amd64:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO_CMD) build -o build-win/$(APP_NAME).exe $(SRC_DIR)/main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO_CMD) build -o windows/$(APP_NAME).exe $(SRC_DIR)/main.go
 
 # Удаление всех собранных файлов
 clean:
-	rm -rf build-macos build-linux build-win 2>/dev/null || true
+		@for platform in $(PLATFORMS); do \
+    		rm -rf $${platform%/*} build || true; \
+    	done
 
 # Помощь: отображает доступные команды
 help:
